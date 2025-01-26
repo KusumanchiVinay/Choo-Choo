@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choo Choo- Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            background: url('/static/bg.jpg') no-repeat center center fixed;
+            background-size: cover;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        header {
+            background-color: rgba(0, 0, 0, 0.7);
+            width: 100%;
+            height: 80px;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px; /* Reduced padding to move nav links to the left */
+            position: fixed; /* Keeps the header fixed at the top */
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo img {
+            height: 80px;
+            width: 80px;
+            border-radius: 10px;
+        }
+        .logo h2{
+            color: white;
+        }
+
+        .container {
+            background: rgba(27, 58, 104, 0.4);
+            border-radius: 8px;
+            padding: 20px 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .container h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2em;
+            color: #fff;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 1em;
+            color: white;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            background: #f1f1f1;
+            color: #333;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border: 2px solid #4A90E2;
+        }
+
+        .button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            background: #4A90E2;
+            color: #fff;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+
+        .button:hover {
+            background: #357ABD;
+        }
+
+        .toggle-link {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: white;
+        }
+
+        .toggle-link a {
+            color: #4A90E2;
+            text-decoration: none;
+        }
+
+        .toggle-link a:hover {
+            text-decoration: underline;
+        }
+
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <a href="/hom">
+                <img src="/static/logo.jpg" alt="Logo">
+            </a>
+            
+            <h2>Choo Choo</h2>
+            
+        </div>
+
+    </header>
+
+    <div class="container">
+        <h1>Login</h1>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="Enter your email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+            <button type="submit" class="button">Login</button>
+        </form>
+        <div class="toggle-link">
+            Don't have an account? <a href="/signup">Sign Up</a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("login-form").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+    
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+    
+                if (response.ok) {
+                    const result = await response.json();
+                    window.location.href = result.redirect_url; // Redirect directly to the index page
+                } else {
+                    const result = await response.json();
+                    alert(result.message); // Display error messages only for failed attempts
+                }
+            } catch (err) {
+                console.error(err);
+                alert("An error occurred while logging in. Please try again.");
+            }
+        });
+    </script>
+    
+</body>
+</html>

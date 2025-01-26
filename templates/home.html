@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webpage with Login and Sign Up</title>
+    <style>
+        body {
+            background: url('/static/1a.jpg') no-repeat center center;
+            background-size: cover;
+            background-attachment: scroll; /* Allow the background to move when scrolling */
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
+        }
+
+        header {
+            background-color: rgba(0, 0, 0, 0.7);
+            width: 100%;
+            height: 80px;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px; /* Reduced padding to move nav links to the left */
+            position: fixed; /* Keeps the header fixed at the top */
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo img {
+            height: 80px;
+            width: 80px;
+            border-radius: 10px;
+        }
+        .logo h2{
+            color: white;
+        }
+
+        nav {
+            display: flex;
+            gap: 15px;
+            margin-right: 25px; /* Adjust margin to move nav links slightly left */
+        }
+
+        nav a {
+            text-decoration: none;
+            color: white;
+            padding: 8px 15px;
+            border: 1px solid white;
+            border-radius: 5px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        nav a:hover {
+            background-color: white;
+            color: black;
+        }
+
+        .content {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            height: calc(100vh - 120px); /* Adjust height to exclude header and footer */
+            padding: 20px;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+            margin-top: 60px; /* Space for fixed header */
+        }
+
+        .content .text {
+            max-width: 50%;
+            text-align: left; /* Align text to the left */
+        }
+
+        .content .text h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .content .text p {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .content .text a {
+            text-decoration: none;
+            background-color: white;
+            color: black;
+            padding: 10px 20px;
+            border-radius: 5px;
+            border-style:ridge;
+            border-color: white;
+            font-size: 16px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .content .text a:hover {
+            background-color: black;
+            color: white;
+        }
+
+        footer {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            text-align: center;
+            padding: 10px 20px;
+            width: 100%;
+            margin-top: auto; /* Push footer to the bottom */
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <a href="/hom">
+                <img src="/static/logo.jpg" alt="Logo">
+            </a>
+            
+            <h2>Choo Choo</h2>
+            
+        </div>
+        <nav>
+            <a href="/login">Login</a>
+            <a href="/signup">Sign Up</a>
+        </nav>
+    </header>
+
+    <div class="content">
+        <div class="text">
+            <h1>Welcome to Our Platform</h1>
+            <p>Discover the best way to manage your tasks and projects efficiently. Join our community and make your workflow seamless and productive.</p>
+            <a href="/login">Go to Login</a>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Your Company. All rights reserved.</p>
+    </footer>
+
+    
+</body>
+</html>
