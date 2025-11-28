@@ -101,7 +101,7 @@
 
             if (sender === 'bot') {
                 const speakBtn = document.createElement('button');
-                speakBtn.innerHTML = '🔊';
+                speakBtn.innerHTML = '🎵';
                 speakBtn.classList.add('speak-btn');
                 speakBtn.title = 'Click to hear the response';
 
@@ -111,7 +111,7 @@
 
                 utterance.onend = () => {
                     isSpeaking = false;
-                    speakBtn.innerHTML = '🔊';
+                    speakBtn.innerHTML = '🎵';
                 };
 
                 speakBtn.onclick = (e) => {
@@ -124,7 +124,7 @@
                         speakBtn.innerHTML = '⏸️';
                     } else {
                         stopCurrentSpeech();
-                        speakBtn.innerHTML = '🔊';
+                        speakBtn.innerHTML = '🎵';
                     }
                 };
 
