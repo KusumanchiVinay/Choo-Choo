@@ -186,6 +186,10 @@ def fallback_response(user_input):
 def home():
     return render_template('home.html')
 
+@app.route('/demo')
+def demo():
+    return render_template('demo.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':

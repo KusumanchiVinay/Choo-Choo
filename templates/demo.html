@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choo Choo - Demo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">
+            <a href="/">
+                <img src="/static/logo.jpg" alt="Logo">
+            </a>
+            <h2>Choo Choo</h2>
+        </div>
+
+        <div class="profile-dropdown">
+            <button class="profile-btn" id="profile-btn">DEMO</button>
+            <div class="dropdown-content" id="dropdown-content">
+                <a href="/login">Login to Use</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Sidebar with Chat History -->
+        <div class="sidebar">
+            <div class="chat-history" id="chat-history">
+                <div class="chathistory-h3">
+                    <h3>Chat History</h3>
+                </div>
+                <button class="new-chat-btn" id="new-chat-btn">+ New Chat</button>
+                <div class="history-container">
+                    <ul id="history-list">
+                        <li class="active">Hello! How are you?</li>
+                        <li>Weather in London</li>
+                        <li>Tell me about AI</li>
+                    </ul>
+                </div>
+            </div>
+            <button id="toggle-history-btn" class="hamburger-btn">
+                ☰
+            </button>
+        </div>
+        
+        <!-- Chat Container Section -->
+        <div class="chat-container">
+            <div id="messages">
+                <div class="message user">
+                    <div>Hello Choo Choo!</div>
+                </div>
+                <div class="message bot">
+                    <div>Hi there! How can I help you today? I can answer questions, fetch weather updates, get the latest news, and much more!</div>
+                    <button class="speak-btn" title="Click to hear the response">🔊</button>
+                </div>
+                <div class="message user">
+                    <div>What's the weather in London?</div>
+                </div>
+                <div class="message bot">
+                    <div>🌤 **Weather Report for London, UK**
+Temperature: 8°C
+Feels Like: 5°C
+Condition: Partly cloudy
+Humidity: 72%</div>
+                    <button class="speak-btn" title="Click to hear the response">🔊</button>
+                </div>
+                <div class="message user">
+                    <div>Tell me latest news</div>
+                </div>
+                <div class="message bot">
+                    <div>📰 **Top News on 'latest'**
+
+1. Breaking: New AI breakthrough announced
+   Source: TechNews
+
+2. Climate action bill passes parliament
+   Source: BBC News
+
+3. Space exploration reaches new milestone
+   Source: NASA Updates</div>
+                    <button class="speak-btn" title="Click to hear the response">🔊</button>
+                </div>
+            </div>
+            <div id="input-container">
+                <input type="text" id="user-input" placeholder="I'm here to help! Ask me anything." disabled>
+                <button id="send-button" disabled>Send</button>
+                <button id="microphone" disabled>🎙</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('profile-btn').addEventListener('click', function() {
+            document.getElementById('dropdown-content').classList.toggle('show');
+        });
+
+        window.onclick = function(event) {
+            if (!event.target.matches('.profile-btn')) {
+                const dropdowns = document.getElementsByClassName("dropdown-content");
+                Array.from(dropdowns).forEach(function(openDropdown) {
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                });
+            }
+        };
+
+        document.getElementById('toggle-history-btn').addEventListener('click', () => {
+            document.getElementById('chat-history').classList.toggle('show');
+        });
+
+        // Speak button demo
+        document.querySelectorAll('.speak-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                alert('Login to use voice features!');
+            });
+        });
+
+        document.getElementById('send-button').addEventListener('click', () => {
+            alert('Please login to send messages!');
+        });
+    </script>
+</body>
+</html>
