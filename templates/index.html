@@ -346,23 +346,18 @@
 
         async function createNewChat(forceCreate = false) {
             try {
-                // Check if current chat is empty - if so, don't create new one
-                if (!forceCreate && !isGuest && activeSessionId && messagesContainer.children.length === 0) {
-                    // Current chat is already empty, just reload it
-                    return;
-                }
-                
-                // If we already have an active session and page is just loading, don't create new
-                if (!forceCreate && activeSessionId) {
-                    return;
-                }
-                
-                const response = await fetch('/api/new-session', { method: 'POST' });
+                const response = await fetch('/api/new-session', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ forceCreate })
+                });
                 if (!response.ok) return;
                 
                 const data = await response.json();
                 activeSessionId = data.chat_session_id;
-                messagesContainer.innerHTML = '';
+                if (forceCreate || !messagesContainer.children.length) {
+                    messagesContainer.innerHTML = '';
+                }
                 if (!data.is_guest) {
                     await fetchChatHistory();
                 }
@@ -375,7 +370,11 @@
             chatHistory.classList.toggle('show');
         });
 
-        newChatBtn.addEventListener('click', createNewChat);
+        newChatBtn.addEventListener('click', async () => {
+            activeSessionId = null;
+            messagesContainer.innerHTML = '';
+            await createNewChat(true);
+        });
 
         profileBtn.addEventListener('click', function() {
             dropdownContent.classList.toggle('show');

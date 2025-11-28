@@ -24,7 +24,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.5-pro')
     print("✓ Gemini AI configured successfully")
 else:
     model = None
@@ -413,9 +413,17 @@ def new_session():
         session['guest_session_id'] = str(uuid.uuid4())
         return jsonify({"chat_session_id": session['guest_session_id'], "is_guest": True}), 200
     
-    # If already have a chat session, return it
-    if 'chat_session_id' in session:
-        return jsonify({"chat_session_id": session['chat_session_id'], "is_guest": False}), 200
+    data = request.get_json() or {}
+    force_create = data.get('forceCreate', False)
+    
+    # If not forcing new creation and already have a session, return it
+    if not force_create and 'chat_session_id' in session:
+        try:
+            existing = chat_history_collection.find_one({'_id': ObjectId(session['chat_session_id'])})
+            if existing:
+                return jsonify({"chat_session_id": session['chat_session_id'], "is_guest": False}), 200
+        except Exception:
+            pass
     
     try:
         session_doc = {
