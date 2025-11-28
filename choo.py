@@ -413,6 +413,10 @@ def new_session():
         session['guest_session_id'] = str(uuid.uuid4())
         return jsonify({"chat_session_id": session['guest_session_id'], "is_guest": True}), 200
     
+    # If already have a chat session, return it
+    if 'chat_session_id' in session:
+        return jsonify({"chat_session_id": session['chat_session_id'], "is_guest": False}), 200
+    
     try:
         session_doc = {
             "email": session['email'],

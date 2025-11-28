@@ -182,7 +182,10 @@
             const historyItems = document.querySelectorAll('#history-list li');
             if (historyItems.length > 0) {
                 const title = firstMessage.length > 30 ? firstMessage.substring(0, 30) + '...' : firstMessage;
-                historyItems[0].textContent = title;
+                const titleSpan = historyItems[0].querySelector('span');
+                if (titleSpan) {
+                    titleSpan.textContent = title;
+                }
             }
         }
 
@@ -341,11 +344,16 @@
             }
         }
 
-        async function createNewChat() {
+        async function createNewChat(forceCreate = false) {
             try {
                 // Check if current chat is empty - if so, don't create new one
-                if (!isGuest && activeSessionId && messagesContainer.children.length === 0) {
+                if (!forceCreate && !isGuest && activeSessionId && messagesContainer.children.length === 0) {
                     // Current chat is already empty, just reload it
+                    return;
+                }
+                
+                // If we already have an active session and page is just loading, don't create new
+                if (!forceCreate && activeSessionId) {
                     return;
                 }
                 
