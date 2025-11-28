@@ -23,6 +23,10 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
+print(f"DEBUG: GOOGLE_API_KEY length: {len(GOOGLE_API_KEY) if GOOGLE_API_KEY else 0}")
+print(f"DEBUG: NEWS_API_KEY length: {len(NEWS_API_KEY) if NEWS_API_KEY else 0}")
+print(f"DEBUG: WEATHER_API_KEY length: {len(WEATHER_API_KEY) if WEATHER_API_KEY else 0}")
+
 # Configure Gemini AI
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
@@ -80,13 +84,16 @@ def get_weather(city):
 def get_news(query="latest", num_articles=5):
     """Fetch news with better error handling"""
     if not NEWS_API_KEY:
-        return "⚠ News API key not configured"
+        print(f"DEBUG: NEWS_API_KEY is None or empty")
+        return "⚠ News API key not configured. Please add NEWS_API_KEY to Replit Secrets."
     
+    print(f"DEBUG: Fetching news for: {query}")
     try:
-        # Use a more reliable NewsAPI endpoint
         headers = {'User-Agent': 'Mozilla/5.0'}
         news_url = f"https://newsapi.org/v2/everything?q={query}&sortBy=publishedAt&language=en&pageSize={num_articles}&apiKey={NEWS_API_KEY}"
         response = requests.get(news_url, headers=headers, timeout=10)
+        
+        print(f"DEBUG: News API Response Status: {response.status_code}")
         
         if response.status_code == 200:
             news_data = response.json()
@@ -150,18 +157,23 @@ def choo_choo_conversation(user_input, conversation_history=None):
     # Use Gemini AI for general conversation
     if model:
         try:
-            # Build better prompt with context
+            # Build better prompt with context and instructions
             system_prompt = """You are Choo Choo, a friendly and helpful AI assistant. 
-You provide clear, concise, and useful responses. You're knowledgeable, conversational, and always helpful.
-Keep responses natural and not too long (2-3 sentences usually)."""
+You provide clear, concise, and useful responses. You are knowledgeable, conversational, and always helpful.
+Keep responses natural and not too long (1-3 sentences usually).
+Be warm and engaging in tone.
+If asked about capabilities, mention: weather updates, news fetching, time, date, and general conversations."""
             
             # Build conversation context from history
             context = ""
             if conversation_history and len(conversation_history) > 0:
                 context = "\n\nRecent conversation context:\n"
                 for msg in conversation_history[-3:]:  # Last 3 exchanges
-                    context += f"User: {msg.get('user', {}).get('text', '')}\n"
-                    context += f"Assistant: {msg.get('bot', {}).get('text', '')}\n"
+                    user_text = msg.get('user', {}).get('text', '')
+                    bot_text = msg.get('bot', {}).get('text', '')
+                    if user_text and bot_text:
+                        context += f"User: {user_text}\n"
+                        context += f"Assistant: {bot_text}\n"
             
             prompt = f"{system_prompt}{context}\n\nUser: {user_input}\nAssistant:"
             
@@ -172,7 +184,8 @@ Keep responses natural and not too long (2-3 sentences usually)."""
                     max_output_tokens=500,
                 )
             )
-            return response.text.strip() if response.text else "I'm thinking... please try again."
+            result = response.text.strip() if response.text else "I'm thinking... please try again."
+            return result
         except Exception as e:
             print(f"Gemini API Error: {e}")
             return fallback_response(user_input)

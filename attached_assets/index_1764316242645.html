@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choo Choo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">
+            <a href="/hom">
+                <img src="/static/logo.jpg" alt="Logo">
+            </a>
+            <h2>Choo Choo</h2>
+        </div>
+
+        <div class="profile-dropdown">
+            <button class="profile-btn" id="profile-btn"></button>
+            <div class="dropdown-content" id="dropdown-content">
+                <a href="/new-chat">New Chat</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Toggle Chat History Button (Hamburger Menu) -->
+        <div class="sidebar">
+            <div class="chat-history" id="chat-history">
+                <div class="chathistory-h3">
+                    <h3>Chat History</h3>
+                </div>
+                <div class="history-container">
+                    <ul id="history-list"></ul>
+                </div>
+            </div>
+            <button id="toggle-history-btn" class="hamburger-btn">
+                &#9776; <!-- Hamburger icon (three horizontal lines) -->
+            </button>
+        </div>
+        <!-- Chat Container Section -->
+        <div class="chat-container">
+            <div id="messages"></div>
+            <div id="input-container">
+                <input type="text" id="user-input" placeholder="Type a message...">
+                <button id="send-button">Send</button>
+                <button id="microphone">🎙</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fetch the email from the server and set the profile button text
+            fetch('/api/get-email')
+                .then(response => response.json())
+                .then(data => {
+                    const email = data.email;
+                    const initials = email.substring(0, 2).toUpperCase();
+                    document.getElementById('profile-btn').textContent = initials;
+                });
+
+            // Toggle dropdown visibility
+            document.getElementById('profile-btn').addEventListener('click', function() {
+                document.getElementById('dropdown-content').classList.toggle('show');
+            });
+
+            // Close the dropdown if the user clicks outside of it
+            window.onclick = function(event) {
+                if (!event.target.matches('.profile-btn')) {
+                    const dropdowns = document.getElementsByClassName("dropdown-content");
+                    Array.from(dropdowns).forEach(function(openDropdown) {
+                        if (openDropdown.classList.contains('show')) {
+                            openDropdown.classList.remove('show');
+                        }
+                    });
+                }
+            };
+
+            // Fetch chat history for the logged-in user
+            fetch('/api/chat-history')
+                .then(response => response.json())
+                .then(data => {
+                    const historyList = document.getElementById('history-list');
+                    historyList.innerHTML = "";
+                    data.chat_history.forEach(chat => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = `${chat.title}`;
+                        listItem.dataset.sessionId = chat.chat_session_id;
+                        listItem.addEventListener('click', function () {
+                            loadChatSession(chat.chat_session_id);
+                        });
+                        historyList.appendChild(listItem);
+                    });
+                })
+                .catch(error => console.error("Error fetching chat history:", error));
+
+            // Toggle Chat History Section visibility
+            let historyVisible = true; // Track visibility state
+
+            document.getElementById('toggle-history-btn').addEventListener('click', function () {
+                const chatHistory = document.getElementById('chat-history');
+                chatHistory.style.display = historyVisible ? 'none' : 'block';
+                historyVisible = !historyVisible;
+            });
+
+            // Auto-load the current chat session if it exists
+            fetch('/api/get-current-session')
+                .then(response => response.json())
+                .then(data => {
+                    const currentSessionId = data.chat_session_id;
+                    if (currentSessionId) {
+                        // Load that session into the chat window
+                        loadChatSession(currentSessionId);
+                    }
+                })
+                .catch(error => console.error('Error fetching current session:', error));
+        });
+
+        async function fetchChatHistory() {
+            try {
+                const response = await fetch('/api/chat-history');
+                const data = await response.json();
+                const historyList = document.getElementById('history-list');
+                historyList.innerHTML = "";
+                data.chat_history.forEach(chat => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = chat.title;
+                    listItem.dataset.sessionId = chat.chat_session_id;
+                    listItem.addEventListener('click', () => {
+                        loadChatSession(chat.chat_session_id);
+                    });
+                    historyList.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error("Error fetching chat history:", error);
+            }
+        }
+    </script>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
