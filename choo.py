@@ -7,6 +7,7 @@ from bson import ObjectId
 from dotenv import load_dotenv
 import hashlib
 import google.generativeai as genai
+import uuid
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-key-change-in-production")
@@ -269,27 +270,25 @@ def signup():
 @app.route('/index')
 def index():
     if 'email' not in session:
-        return redirect(url_for('login'))
-    
-    if 'chat_session_id' in session:
-        return render_template('index.html')
-
-    last_session = chat_history_collection.find_one(
-        {"email": session['email']}, sort=[("created_at", -1)]
-    )
-
-    if last_session:
-        session['chat_session_id'] = str(last_session["_id"])
+        session['guest_session_id'] = str(uuid.uuid4())
     else:
-        session_doc = {
-            "email": session['email'],
-            "user_id": session.get('user_id'),
-            "title": "New Chat",
-            "messages": [],
-            "created_at": datetime.utcnow()
-        }
-        result = chat_history_collection.insert_one(session_doc)
-        session['chat_session_id'] = str(result.inserted_id)
+        if 'chat_session_id' not in session:
+            last_session = chat_history_collection.find_one(
+                {"email": session['email']}, sort=[("created_at", -1)]
+            )
+
+            if last_session:
+                session['chat_session_id'] = str(last_session["_id"])
+            else:
+                session_doc = {
+                    "email": session['email'],
+                    "user_id": session.get('user_id'),
+                    "title": "New Chat",
+                    "messages": [],
+                    "created_at": datetime.utcnow()
+                }
+                result = chat_history_collection.insert_one(session_doc)
+                session['chat_session_id'] = str(result.inserted_id)
 
     return render_template('index.html')
 
@@ -299,15 +298,13 @@ def hom():
 
 @app.route('/logout')
 def logout():
-    session.pop('email', None)
-    session.pop('chat_session_id', None)
-    session.pop('user_id', None)
-    return render_template('home.html')
+    session.clear()
+    return redirect(url_for('home'))
 
 @app.route('/new-chat', methods=['GET'])
 def new_chat():
     if 'email' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('index'))
     
     session_doc = {
         "email": session['email'],
@@ -325,9 +322,9 @@ def new_chat():
 def get_email():
     email = session.get('email')
     if email:
-        return jsonify({"email": email})
+        return jsonify({"email": email, "is_guest": False})
     else:
-        return jsonify({"email": "Guest"})
+        return jsonify({"email": "Guest", "is_guest": True})
 
 @app.route('/api/health-check', methods=['GET'])
 def health_check():
@@ -344,12 +341,13 @@ def api_typed_input():
     data = request.json
     user_input = data.get('text', '').strip()
     session_id = data.get('sessionId') or session.get('chat_session_id')
+    is_authenticated = 'email' in session
     
     if not user_input:
         return jsonify({"error": "Empty input"}), 400
     
     conversation_history = []
-    if session_id:
+    if session_id and is_authenticated:
         try:
             chat_session = chat_history_collection.find_one({'_id': ObjectId(session_id)})
             if chat_session:
@@ -360,7 +358,7 @@ def api_typed_input():
     response = choo_choo_conversation(user_input, conversation_history)
     updated_title = None
 
-    if session_id:
+    if session_id and is_authenticated:
         try:
             chat_session = chat_history_collection.find_one({'_id': ObjectId(session_id)})
             if chat_session:
@@ -388,8 +386,10 @@ def api_typed_input():
 @app.route('/api/chat-history', methods=['GET'])
 def chat_history():
     email = session.get('email')
+    
     if not email:
-        return jsonify({"error": "Unauthorized"}), 401
+        return jsonify({"chat_history": [], "is_guest": True})
+    
     try:
         sessions_cursor = chat_history_collection.find({"email": email}).sort("created_at", -1).limit(50)
         chat_list = []
@@ -403,14 +403,16 @@ def chat_history():
                 "preview": preview,
                 "message_count": len(messages)
             })
-        return jsonify({"chat_history": chat_list})
+        return jsonify({"chat_history": chat_list, "is_guest": False})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "is_guest": False}), 500
 
 @app.route('/api/new-session', methods=['POST'])
 def new_session():
     if 'email' not in session:
-        return jsonify({"error": "Unauthorized"}), 401
+        session['guest_session_id'] = str(uuid.uuid4())
+        return jsonify({"chat_session_id": session['guest_session_id'], "is_guest": True}), 200
+    
     try:
         session_doc = {
             "email": session['email'],
@@ -421,15 +423,17 @@ def new_session():
         }
         result = chat_history_collection.insert_one(session_doc)
         session['chat_session_id'] = str(result.inserted_id)
-        return jsonify({"chat_session_id": str(result.inserted_id)}), 200
+        return jsonify({"chat_session_id": str(result.inserted_id), "is_guest": False}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/get-chat/<session_id>', methods=['GET'])
 def get_chat(session_id):
     email = session.get('email')
+    
     if not email:
         return jsonify({"error": "Unauthorized"}), 401
+    
     try:
         chat_session = chat_history_collection.find_one({'_id': ObjectId(session_id), 'email': email})
         if chat_session:
@@ -444,8 +448,10 @@ def get_chat(session_id):
 @app.route('/api/delete-chat/<session_id>', methods=['DELETE'])
 def delete_chat(session_id):
     email = session.get('email')
+    
     if not email:
         return jsonify({"error": "Unauthorized"}), 401
+    
     try:
         result = chat_history_collection.delete_one({'_id': ObjectId(session_id), 'email': email})
         if result.deleted_count > 0:

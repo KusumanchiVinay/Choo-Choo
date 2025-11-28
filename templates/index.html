@@ -19,10 +19,12 @@
         </div>
 
         <div class="profile-dropdown">
-            <button class="profile-btn" id="profile-btn"></button>
+            <button class="profile-btn" id="profile-btn">Guest</button>
             <div class="dropdown-content" id="dropdown-content">
-                <a href="/new-chat">New Chat</a>
-                <a href="/logout">Logout</a>
+                <a href="/login" id="login-link">Login</a>
+                <a href="/signup" id="signup-link">Sign Up</a>
+                <a href="/logout" id="logout-link" style="display:none;">Logout</a>
+                <a href="/new-chat" id="new-chat-link" style="display:none;">New Chat</a>
             </div>
         </div>
     </header>
@@ -30,7 +32,7 @@
     <!-- Main Container -->
     <div class="main-container">
         <!-- Sidebar with Chat History -->
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar" style="display:none;">
             <div class="chat-history" id="chat-history">
                 <div class="chathistory-h3">
                     <h3>Chat History</h3>
@@ -43,6 +45,12 @@
             <button id="toggle-history-btn" class="hamburger-btn">
                 ☰
             </button>
+        </div>
+
+        <!-- Guest Mode Banner -->
+        <div id="guest-banner" class="guest-banner" style="display:none;">
+            <p>💬 You're in <strong>Guest Mode</strong> - Chat freely but messages won't be saved.</p>
+            <a href="/login"><button>Login to Save History</button></a>
         </div>
         
         <!-- Chat Container Section -->
@@ -64,11 +72,16 @@
         const toggleHistoryBtn = document.getElementById('toggle-history-btn');
         const chatHistory = document.getElementById('chat-history');
         const newChatBtn = document.getElementById('new-chat-btn');
+        const sidebar = document.getElementById('sidebar');
+        const profileBtn = document.getElementById('profile-btn');
+        const dropdownContent = document.getElementById('dropdown-content');
+        const guestBanner = document.getElementById('guest-banner');
 
         let isListening = false;
         let activeSessionId = null;
         let currentUtterance = null;
         let isSpeaking = false;
+        let isGuest = true;
 
         function stopCurrentSpeech() {
             if ('speechSynthesis' in window && currentUtterance) {
@@ -132,7 +145,7 @@
 
         async function handleSend() {
             const text = userInput.value.trim();
-            if (text && activeSessionId) {
+            if (text) {
                 stopCurrentSpeech();
                 addMessage(text, 'user');
                 userInput.value = '';
@@ -154,7 +167,7 @@
                     const data = await response.json();
                     addMessage(data.response, 'bot', true);
 
-                    if (data.updated_title) {
+                    if (data.updated_title && !isGuest) {
                         updateChatTitle(data.updated_title);
                         await fetchChatHistory();
                     }
@@ -234,17 +247,25 @@
                 if (!response.ok) return;
                 
                 const data = await response.json();
+                if (data.is_guest) {
+                    sidebar.style.display = 'none';
+                    guestBanner.style.display = 'block';
+                    return;
+                }
+
                 const historyList = document.getElementById('history-list');
                 
                 if (historyList) {
                     historyList.innerHTML = '';
-                    data.chat_history.forEach(chat => {
-                        const li = document.createElement('li');
-                        li.textContent = chat.title;
-                        li.dataset.sessionId = chat.chat_session_id;
-                        li.onclick = () => loadChat(chat.chat_session_id);
-                        historyList.appendChild(li);
-                    });
+                    if (data.chat_history && data.chat_history.length > 0) {
+                        data.chat_history.forEach(chat => {
+                            const li = document.createElement('li');
+                            li.textContent = chat.title;
+                            li.dataset.sessionId = chat.chat_session_id;
+                            li.onclick = () => loadChat(chat.chat_session_id);
+                            historyList.appendChild(li);
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching chat history:', error);
@@ -284,7 +305,9 @@
                 const data = await response.json();
                 activeSessionId = data.chat_session_id;
                 messagesContainer.innerHTML = '';
-                await fetchChatHistory();
+                if (!data.is_guest) {
+                    await fetchChatHistory();
+                }
             } catch (error) {
                 console.error('Error creating new chat:', error);
             }
@@ -296,37 +319,52 @@
 
         newChatBtn.addEventListener('click', createNewChat);
 
+        profileBtn.addEventListener('click', function() {
+            dropdownContent.classList.toggle('show');
+        });
+
+        window.onclick = function(event) {
+            if (!event.target.matches('.profile-btn')) {
+                const dropdowns = document.getElementsByClassName("dropdown-content");
+                Array.from(dropdowns).forEach(function(openDropdown) {
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                });
+            }
+        };
+
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const emailResponse = await fetch('/api/get-email');
                 if (emailResponse.ok) {
-                    const { email } = await emailResponse.json();
-                    if (email !== 'Guest') {
+                    const { email, is_guest } = await emailResponse.json();
+                    isGuest = is_guest;
+                    
+                    if (!is_guest) {
                         const initials = email.substring(0, 2).toUpperCase();
-                        document.getElementById('profile-btn').textContent = initials;
+                        profileBtn.textContent = initials;
+                        sidebar.style.display = 'flex';
+                        guestBanner.style.display = 'none';
+                        document.getElementById('login-link').style.display = 'none';
+                        document.getElementById('signup-link').style.display = 'none';
+                        document.getElementById('logout-link').style.display = 'block';
+                        document.getElementById('new-chat-link').style.display = 'block';
+                        await fetchChatHistory();
+                    } else {
+                        profileBtn.textContent = 'Guest';
+                        sidebar.style.display = 'none';
+                        guestBanner.style.display = 'block';
+                        document.getElementById('login-link').style.display = 'block';
+                        document.getElementById('signup-link').style.display = 'block';
+                        document.getElementById('logout-link').style.display = 'none';
+                        document.getElementById('new-chat-link').style.display = 'none';
                     }
                 }
             } catch (error) {
                 console.error('Error checking email:', error);
             }
             
-            // Toggle dropdown
-            document.getElementById('profile-btn').addEventListener('click', function() {
-                document.getElementById('dropdown-content').classList.toggle('show');
-            });
-
-            window.onclick = function(event) {
-                if (!event.target.matches('.profile-btn')) {
-                    const dropdowns = document.getElementsByClassName("dropdown-content");
-                    Array.from(dropdowns).forEach(function(openDropdown) {
-                        if (openDropdown.classList.contains('show')) {
-                            openDropdown.classList.remove('show');
-                        }
-                    });
-                }
-            };
-            
-            await fetchChatHistory();
             await createNewChat();
         });
     </script>
