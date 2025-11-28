@@ -181,17 +181,17 @@ header {
 }
 
 #history-list li {
-  padding: 12px;
+  padding: 8px 10px;
   margin-bottom: 8px;
   background: #f5f5f5;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   transition: all 0.3s;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   border-left: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 #history-list li:hover {
@@ -203,6 +203,29 @@ header {
   background: #667eea;
   color: white;
   border-left-color: #764ba2;
+}
+
+.delete-chat-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+}
+
+.delete-chat-btn:hover {
+  opacity: 1;
+  background: rgba(255, 59, 48, 0.2);
+}
+
+#history-list li.active .delete-chat-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 #toggle-history-btn {

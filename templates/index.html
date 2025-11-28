@@ -260,9 +260,25 @@
                     if (data.chat_history && data.chat_history.length > 0) {
                         data.chat_history.forEach(chat => {
                             const li = document.createElement('li');
-                            li.textContent = chat.title;
                             li.dataset.sessionId = chat.chat_session_id;
-                            li.onclick = () => loadChat(chat.chat_session_id);
+                            
+                            const chatTitle = document.createElement('span');
+                            chatTitle.textContent = chat.title;
+                            chatTitle.style.flex = '1';
+                            chatTitle.style.cursor = 'pointer';
+                            chatTitle.onclick = () => loadChat(chat.chat_session_id);
+                            
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.textContent = '🗑';
+                            deleteBtn.classList.add('delete-chat-btn');
+                            deleteBtn.title = 'Delete this chat';
+                            deleteBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                deleteChat(chat.chat_session_id);
+                            };
+                            
+                            li.appendChild(chatTitle);
+                            li.appendChild(deleteBtn);
                             historyList.appendChild(li);
                         });
                     }
@@ -297,8 +313,42 @@
             }
         }
 
+        async function deleteChat(sessionId) {
+            if (!confirm('Delete this chat? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/delete-chat/${sessionId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    alert('Failed to delete chat');
+                    return;
+                }
+                
+                // If deleting the current chat, create new one
+                if (sessionId === activeSessionId) {
+                    await createNewChat();
+                } else {
+                    // Just refresh the history
+                    await fetchChatHistory();
+                }
+            } catch (error) {
+                console.error('Error deleting chat:', error);
+                alert('Error deleting chat');
+            }
+        }
+
         async function createNewChat() {
             try {
+                // Check if current chat is empty - if so, don't create new one
+                if (!isGuest && activeSessionId && messagesContainer.children.length === 0) {
+                    // Current chat is already empty, just reload it
+                    return;
+                }
+                
                 const response = await fetch('/api/new-session', { method: 'POST' });
                 if (!response.ok) return;
                 
