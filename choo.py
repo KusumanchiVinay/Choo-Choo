@@ -6,6 +6,7 @@ import os
 from bson import ObjectId
 from dotenv import load_dotenv
 import hashlib
+import google.generativeai as genai
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-key-change-in-production")
@@ -20,6 +21,16 @@ load_dotenv(".env.local", override=False)
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# Configure Gemini AI
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+    model = genai.GenerativeModel('gemini-pro')
+    print("✓ Gemini AI configured successfully")
+else:
+    model = None
+    print("⚠ Gemini API key not found")
 
 # MongoDB connection setup
 try:
@@ -40,8 +51,34 @@ def verify_password(stored_hash, password):
     """Verify password"""
     return stored_hash == hashlib.sha256(password.encode()).hexdigest()
 
-# Simple conversation logic
-def choo_choo_conversation(user_input):
+# AI conversation using Google Gemini
+def choo_choo_conversation(user_input, conversation_history=None):
+    user_input = user_input.strip()
+    
+    # Use Gemini AI if available
+    if model:
+        try:
+            # Build conversation context
+            context = "You are Choo Choo, a friendly AI assistant. You are helpful, concise, and conversational."
+            
+            if conversation_history and len(conversation_history) > 0:
+                context += "\n\nPrevious conversation:\n"
+                for msg in conversation_history[-5:]:  # Last 5 messages for context
+                    context += f"User: {msg.get('user', {}).get('text', '')}\n"
+                    context += f"Assistant: {msg.get('bot', {}).get('text', '')}\n"
+            
+            prompt = f"{context}\n\nUser: {user_input}\nAssistant:"
+            
+            response = model.generate_content(prompt)
+            return response.text if response.text else "I'm thinking... please try again."
+        except Exception as e:
+            print(f"Gemini API Error: {e}")
+            return fallback_response(user_input)
+    else:
+        return fallback_response(user_input)
+
+def fallback_response(user_input):
+    """Fallback simple responses if Gemini is unavailable"""
     user_input = user_input.lower().strip()
     
     def get_weather(city, api_key):
@@ -61,12 +98,9 @@ def choo_choo_conversation(user_input):
                         f"- Feels Like: {feels_like}°C\n"
                         f"- Condition: {description}\n"
                         f"- Humidity: {humidity}%")
-            elif response.status_code == 404:
-                return "❌ City not found. Please check the city name."
-            else:
-                return "⚠ Error fetching weather data. Please try again later."
+            return "❌ City not found."
         except Exception as e:
-            return f"🚨 Error: {str(e)[:50]}"
+            return f"Error: {str(e)[:50]}"
 
     def get_news(api_key, query="news", num_articles=3):
         try:
@@ -76,20 +110,14 @@ def choo_choo_conversation(user_input):
             if response.status_code == 200:
                 news_data = response.json()
                 articles = news_data.get('articles', [])
-
                 if not articles:
-                    return f"No relevant news articles found for '{query}'."
-
+                    return f"No news found for '{query}'."
                 news_summary = []
                 for i, article in enumerate(articles[:num_articles], start=1):
-                    title = article.get('title', 'No title available')
-                    description = article.get('description', 'No description available')
-                    news_summary.append(f"{i}. 📰 {title}\n   - {description}\n")
-
-                return f"Here are the top {num_articles} news headlines for '{query}':\n\n" + "\n".join(news_summary)
-
-            return f"Error fetching news: {response.status_code}"
-
+                    title = article.get('title', 'No title')
+                    news_summary.append(f"{i}. {title}\n")
+                return "Top headlines:\n" + "".join(news_summary)
+            return "Error fetching news."
         except Exception as e:
             return f"Error: {str(e)[:50]}"
                 
@@ -99,43 +127,28 @@ def choo_choo_conversation(user_input):
         time = now.strftime("%I:%M %p")
         return f"Today is {date}, and the current time is {time}."
     
-    # Predefined responses
-    predefined_responses = {
-        "hi": "Hi, How Can I assist you.?",
-        "hello": "Hello, How Can I assist you.?",
-        "tell me a joke": "Why don't skeletons fight each other? They don't have the guts!",
-        "how are you": "I'm just a bunch of codes, but I'm feeling fantastic! Thanks for asking.",
-        "who are you": "I'm Choo Choo, your friendly personal assistant!",
-        "what is your name": "My name is Choo Choo. I'm here to assist you!",
-        "what can you do": "I can assist you with tasks, fetch news, tell jokes, and much more. Just ask!",
-        "what is ai": "Artificial Intelligence is the simulation of human intelligence in machines.",
-        "tell me about yourself": "I'm Choo Choo, your AI-powered assistant!",
-        "do you like me": "Of course, I do! You're my favorite person to chat with.",
-        "tell me a fact": "Did you know? Honey never spoils. Archaeologists have found honey from 3,000+ years ago still edible!",
-        "how old are you": "I'm timeless! But I've been here since you started me up.",
-        "can you dance": "I can't dance, but I can play great music for you!",
-        "why are you called choo choo": "Because I'm fast, reliable, and always on track to help you!"
-    }
-
-    # Weather check
-    if "weather" in user_input or "temperature" in user_input or "climate" in user_input:
+    # Check for specific queries
+    if "weather" in user_input or "temperature" in user_input:
         if "in" in user_input:
             city = user_input.split("in")[-1].strip()
             if city:
                 return get_weather(city, WEATHER_API_KEY)
-            return "Please specify a city to check the weather."
     
-    # News check
     if "news" in user_input or "headlines" in user_input:
-        topic = user_input.split("news")[-1].strip() if "news" in user_input else "latest news"
+        topic = user_input.split("news")[-1].strip() if "news" in user_input else "latest"
         return get_news(NEWS_API_KEY, query=topic)
 
-    # Date/Time check
     if "date" in user_input or "time" in user_input:
         return get_current_datetime()
     
-    # Return predefined response or default
-    return predefined_responses.get(user_input, f"I'm not sure about that. Ask me something else!")
+    # Default responses
+    responses = {
+        "hi": "Hi! How can I help you?",
+        "hello": "Hello! What can I do for you?",
+        "how are you": "I'm doing great, thanks for asking!",
+        "who are you": "I'm Choo Choo, your AI assistant!",
+    }
+    return responses.get(user_input, "I'm here to help! Ask me anything.")
 
 # Home page route
 @app.route('/')
@@ -159,7 +172,22 @@ def login():
         if not user:
             return jsonify({"message": "Oops, user does not exist."}), 404
         
-        if not verify_password(user.get('password_hash'), password):
+        # Support both hashed and plain passwords (for migration)
+        password_hash = user.get('password_hash')
+        plain_password = user.get('password')
+        
+        if password_hash:
+            if not verify_password(password_hash, password):
+                return jsonify({"message": "Wrong password."}), 401
+        elif plain_password:
+            if plain_password != password:
+                return jsonify({"message": "Wrong password."}), 401
+            # Hash it for next time
+            users_collection.update_one(
+                {"email": email},
+                {'$set': {'password_hash': hash_password(password)}, '$unset': {'password': ""}}
+            )
+        else:
             return jsonify({"message": "Wrong password."}), 401
         
         session.clear()
@@ -287,7 +315,17 @@ def api_typed_input():
     if not user_input:
         return jsonify({"error": "Empty input"}), 400
     
-    response = choo_choo_conversation(user_input)
+    # Get conversation history for context
+    conversation_history = []
+    if session_id:
+        try:
+            chat_session = chat_history_collection.find_one({'_id': ObjectId(session_id)})
+            if chat_session:
+                conversation_history = chat_session.get('messages', [])
+        except:
+            pass
+    
+    response = choo_choo_conversation(user_input, conversation_history)
     updated_title = None
 
     if session_id:
@@ -322,7 +360,7 @@ def chat_history():
     if not email:
         return jsonify({"error": "Unauthorized"}), 401
     try:
-        sessions_cursor = chat_history_collection.find({"email": email}).sort("created_at", -1).limit(20)
+        sessions_cursor = chat_history_collection.find({"email": email}).sort("created_at", -1).limit(50)
         chat_list = []
         for s in sessions_cursor:
             messages = s.get("messages", [])
