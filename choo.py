@@ -14,20 +14,13 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# Load environment variables
 load_dotenv(".env.local", override=False)
 
-# Access environment variables
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-print(f"DEBUG: GOOGLE_API_KEY length: {len(GOOGLE_API_KEY) if GOOGLE_API_KEY else 0}")
-print(f"DEBUG: NEWS_API_KEY length: {len(NEWS_API_KEY) if NEWS_API_KEY else 0}")
-print(f"DEBUG: WEATHER_API_KEY length: {len(WEATHER_API_KEY) if WEATHER_API_KEY else 0}")
-
-# Configure Gemini AI
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
     model = genai.GenerativeModel('gemini-pro')
@@ -36,7 +29,6 @@ else:
     model = None
     print("⚠ Gemini API key not found")
 
-# MongoDB connection setup
 try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
     client.admin.command('ismaster')
@@ -48,15 +40,12 @@ except Exception as e:
     print(f"⚠ MongoDB Connection Error: {e}")
 
 def hash_password(password):
-    """Hash password for security"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def verify_password(stored_hash, password):
-    """Verify password"""
     return stored_hash == hashlib.sha256(password.encode()).hexdigest()
 
 def get_weather(city):
-    """Fetch weather data for a city"""
     if not WEATHER_API_KEY:
         return "⚠ Weather API key not configured"
     try:
@@ -82,18 +71,13 @@ def get_weather(city):
         return f"❌ Error fetching weather: {str(e)[:50]}"
 
 def get_news(query="latest", num_articles=5):
-    """Fetch news with better error handling"""
     if not NEWS_API_KEY:
-        print(f"DEBUG: NEWS_API_KEY is None or empty")
         return "⚠ News API key not configured. Please add NEWS_API_KEY to Replit Secrets."
     
-    print(f"DEBUG: Fetching news for: {query}")
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         news_url = f"https://newsapi.org/v2/everything?q={query}&sortBy=publishedAt&language=en&pageSize={num_articles}&apiKey={NEWS_API_KEY}"
         response = requests.get(news_url, headers=headers, timeout=10)
-        
-        print(f"DEBUG: News API Response Status: {response.status_code}")
         
         if response.status_code == 200:
             news_data = response.json()
@@ -121,24 +105,18 @@ def get_news(query="latest", num_articles=5):
     except Exception as e:
         return f"❌ Error fetching news: {str(e)[:50]}"
 
-# Enhanced NLP conversation with Gemini
 def choo_choo_conversation(user_input, conversation_history=None):
-    """Intelligent conversation using Google Gemini with NLP enhancements"""
     user_input = user_input.strip()
     user_lower = user_input.lower()
     
-    # Check for specific intents first (better NLP)
-    
-    # Weather intent
     if any(word in user_lower for word in ['weather', 'temperature', 'climate', 'forecast', 'how is the weather']):
         if 'in' in user_lower or 'at' in user_lower or 'for' in user_lower:
             parts = user_lower.split('in' if 'in' in user_lower else ('at' if 'at' in user_lower else 'for'))
             if len(parts) > 1:
                 city = parts[-1].strip().title()
                 return get_weather(city)
-        return get_weather("London")  # Default city
+        return get_weather("London")
     
-    # News intent
     if any(word in user_lower for word in ['news', 'headlines', 'latest news', 'breaking news', 'today news']):
         query = "latest"
         if 'in' in user_lower or 'about' in user_lower or 'on' in user_lower:
@@ -147,28 +125,24 @@ def choo_choo_conversation(user_input, conversation_history=None):
                 query = parts[-1].strip()
         return get_news(query)
     
-    # Date/Time intent
     if any(word in user_lower for word in ['date', 'time', 'what is the date', 'what time', 'current time']):
         now = datetime.now()
         date = now.strftime("%A, %B %d, %Y")
         time = now.strftime("%I:%M %p")
         return f"📅 Today is {date}\n🕐 Current time is {time}"
     
-    # Use Gemini AI for general conversation
     if model:
         try:
-            # Build better prompt with context and instructions
             system_prompt = """You are Choo Choo, a friendly and helpful AI assistant. 
 You provide clear, concise, and useful responses. You are knowledgeable, conversational, and always helpful.
 Keep responses natural and not too long (1-3 sentences usually).
 Be warm and engaging in tone.
 If asked about capabilities, mention: weather updates, news fetching, time, date, and general conversations."""
             
-            # Build conversation context from history
             context = ""
             if conversation_history and len(conversation_history) > 0:
                 context = "\n\nRecent conversation context:\n"
-                for msg in conversation_history[-3:]:  # Last 3 exchanges
+                for msg in conversation_history[-3:]:
                     user_text = msg.get('user', {}).get('text', '')
                     bot_text = msg.get('bot', {}).get('text', '')
                     if user_text and bot_text:
@@ -193,7 +167,6 @@ If asked about capabilities, mention: weather updates, news fetching, time, date
         return fallback_response(user_input)
 
 def fallback_response(user_input):
-    """Simple fallback responses"""
     user_lower = user_input.lower().strip()
     
     responses = {
@@ -209,29 +182,25 @@ def fallback_response(user_input):
     }
     return responses.get(user_lower, "That's interesting! Tell me more or ask me something else.")
 
-# Home page route
 @app.route('/')
 def home():
     return render_template('home.html')
 
-# Login page route
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         data = request.json
-        email = data.get('email', '').lower()
+        email = data.get('email', '').lower().strip()
         password = data.get('password', '')
         
         if not email or not password:
             return jsonify({"message": "Email and password required."}), 400
         
-        # Query the database for the user
         user = users_collection.find_one({"email": email})
         
         if not user:
             return jsonify({"message": "Oops, user does not exist."}), 404
         
-        # Support both hashed and plain passwords (for migration)
         password_hash = user.get('password_hash')
         plain_password = user.get('password')
         
@@ -241,7 +210,6 @@ def login():
         elif plain_password:
             if plain_password != password:
                 return jsonify({"message": "Wrong password."}), 401
-            # Hash it for next time
             users_collection.update_one(
                 {"email": email},
                 {'$set': {'password_hash': hash_password(password)}, '$unset': {'password': ""}}
@@ -253,7 +221,6 @@ def login():
         session['email'] = email
         session['user_id'] = str(user['_id'])
 
-        # Create a new chat session on login
         session_doc = {
             "email": email,
             "user_id": str(user['_id']),
@@ -282,11 +249,9 @@ def signup():
         if len(password) < 6:
             return jsonify({"message": "Password must be at least 6 characters."}), 400
         
-        # Check if the email already exists
         if users_collection.find_one({"email": email}):
             return jsonify({"message": "User already exists or try with a different email ID."}), 409
         
-        # Insert the new user with hashed password
         users_collection.insert_one({
             "name": name, 
             "email": email, 
@@ -297,7 +262,6 @@ def signup():
     
     return render_template('signup.html')
 
-# Index page route
 @app.route('/index')
 def index():
     if 'email' not in session:
@@ -306,7 +270,6 @@ def index():
     if 'chat_session_id' in session:
         return render_template('index.html')
 
-    # Check if the user has previous chat sessions
     last_session = chat_history_collection.find_one(
         {"email": session['email']}, sort=[("created_at", -1)]
     )
@@ -314,7 +277,6 @@ def index():
     if last_session:
         session['chat_session_id'] = str(last_session["_id"])
     else:
-        # Create a new chat session
         session_doc = {
             "email": session['email'],
             "user_id": session.get('user_id'),
@@ -355,7 +317,6 @@ def new_chat():
     
     return redirect(url_for('index'))
 
-# API to get the logged-in user's email
 @app.route('/api/get-email', methods=['GET'])
 def get_email():
     email = session.get('email')
@@ -364,10 +325,8 @@ def get_email():
     else:
         return jsonify({"email": "Guest"})
 
-# API to check if APIs are working
 @app.route('/api/health-check', methods=['GET'])
 def health_check():
-    """Check if all APIs are configured and working"""
     status = {
         "gemini": "✓ OK" if GOOGLE_API_KEY and model else "✗ Not configured",
         "weather": "✓ OK" if WEATHER_API_KEY else "✗ Not configured",
@@ -376,7 +335,6 @@ def health_check():
     }
     return jsonify(status)
 
-# Typed input API
 @app.route('/api/typed-input', methods=['POST'])
 def api_typed_input():
     data = request.json
@@ -386,14 +344,13 @@ def api_typed_input():
     if not user_input:
         return jsonify({"error": "Empty input"}), 400
     
-    # Get conversation history for context
     conversation_history = []
     if session_id:
         try:
             chat_session = chat_history_collection.find_one({'_id': ObjectId(session_id)})
             if chat_session:
                 conversation_history = chat_session.get('messages', [])
-        except:
+        except Exception:
             pass
     
     response = choo_choo_conversation(user_input, conversation_history)
@@ -424,7 +381,6 @@ def api_typed_input():
 
     return jsonify({"text": user_input, "response": response, "updated_title": updated_title})
 
-# Chat History API
 @app.route('/api/chat-history', methods=['GET'])
 def chat_history():
     email = session.get('email')
@@ -447,7 +403,6 @@ def chat_history():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Create New Chat Session
 @app.route('/api/new-session', methods=['POST'])
 def new_session():
     if 'email' not in session:
@@ -466,7 +421,6 @@ def new_session():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Get Chat Session
 @app.route('/api/get-chat/<session_id>', methods=['GET'])
 def get_chat(session_id):
     email = session.get('email')
@@ -483,7 +437,6 @@ def get_chat(session_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Delete Chat Session
 @app.route('/api/delete-chat/<session_id>', methods=['DELETE'])
 def delete_chat(session_id):
     email = session.get('email')
@@ -497,7 +450,6 @@ def delete_chat(session_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Error handlers
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"error": "Resource not found"}), 404
