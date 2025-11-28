@@ -9,10 +9,11 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative; /* To ensure proper positioning of fixed elements */
 }
 
 header {
-  background-color: transparent;
+  background-color: rgba(0, 0, 0, 0.7);
   width: 100%;
   height: 80px;
   top: 0;
@@ -20,8 +21,8 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 15px; /* Reduced padding to move nav links to the left */
-  position: fixed; /* Keeps the header fixed at the top */
+  padding: 0 15px;
+  position: fixed;
   z-index: 1000;
 }
 
@@ -35,20 +36,155 @@ header {
   width: 80px;
   border-radius: 10px;
 }
-.logo h2{
+
+.logo h2 {
   color: white;
 }
 
-#chat-container {
-  width: 33%;
+.main-container {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+ 
+  
+}
+
+.chat-history {
+  display: none;
+  width: 30%;
+  overflow-x: hidden;
+  max-width: 300px;
+  height: 84%;
+  background: rgba(27, 58, 104, 0.4); /* Semi-transparent background */
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  padding: 15px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  position: absolute;
+  top: 80px; /* Adjust position to be below header */
+  left: 0px;
+  margin-left: -10px; /* Positioned at the top-left corner */
+}
+
+
+.chathistory-h3{
+  padding: 10px;
+  width: 100%;  
+  
+
+ background-color: rgb(27, 58, 104);
+  text-align: center;
+  margin-top: -30px;
+  margin-bottom: 50px;
+  position: sticky;
+  top: -15px;
+
+}
+/* Other styles for the button to toggle chat history */
+#toggle-history-btn {
+  background-color: #1ab346;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+#toggle-history-btn:hover {
+  background-color: #128c30;
+}
+.hamburger-btn{
+
+  display: flex;
+  position: absolute;
+  left: 10px;
+  top:13.5%;
+  align-items: flex-start;
+  z-index: 10;
+}
+.chat-history::-webkit-scrollbar {
+  width: 10px; /* Adjust width as needed */
+}
+
+/* Track */
+.chat-history::-webkit-scrollbar-track {
+  box-shadow: inset 0 0 5px grey;
+  border-radius: 10px;
+}
+
+/* Handle */
+.chat-history::-webkit-scrollbar-thumb {
+  background: rgb(77, 123, 191);
+  border-radius: 10px;
+}
+
+/* Handle on hover */
+.chat-history::-webkit-scrollbar-thumb:hover {
+  background: rgb(0, 0, 0);
+}
+
+
+.chat-history h3 {
+  color: white;
+  margin-bottom: 15px;
+}
+
+#history-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+#history-list li {
+  background-color: #2a3d66;
+  color: white;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+#history-list li:hover {
+  background-color: #1b2b42;
+}
+
+.chat-container {
+  position: fixed; /* Fixed positioning to center it */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* Ensures it is centered */
+  width: 35%;
   max-width: 600px;
-  height: 70%;
-  background: rgb(27, 58, 104, 0.4); /* Semi-transparent background */
+  height: 65%;
+  background: rgba(27, 58, 104, 0.4); 
   border-radius: 10px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+#messages::-webkit-scrollbar {
+  width: 10px; /* Adjust width as needed */
+}
+
+/* Track */
+#messages::-webkit-scrollbar-track {
+  box-shadow: inset 0 0 5px grey;
+  border-radius: 10px;
+}
+
+/* Handle */
+#messages::-webkit-scrollbar-thumb {
+  background: rgb(77, 123, 191);
+  border-radius: 10px;
+}
+
+/* Handle on hover */
+#messages::-webkit-scrollbar-thumb:hover {
+  background: rgb(0, 0, 0);
 }
 
 #messages {
@@ -66,6 +202,7 @@ header {
   border-radius: 15px;
   line-height: 1.5;
   color: white;
+  white-space: pre-wrap;
 }
 
 .user {
@@ -108,10 +245,105 @@ header {
 
 #microphone {
   cursor: pointer;
-  background: rgb(197, 128, 0);
+  background: rgba(197, 128, 0);
   border: none;
+  border-radius: 5px;
   color: white;
   font-size: 1.5rem;
-  border-radius: 5px;
+}
 
+.profile-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.profile-btn {
+  background-color: #1ab346;
+  color: white;
+  border: none;
+  margin-right: 25px;
+  padding: 10px 15px;
+  border-radius: 40%;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  right: 0;
+  background-color: rgb(0, 0, 0);
+  min-width: 120px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+}
+
+.dropdown-content a {
+  color: rgb(255, 255, 255);
+  padding: 10px;
+  text-decoration: none;
+  display: block;
+}
+
+.dropdown-content a:hover {
+  background-color:  #1ab346;
+}
+
+.show {
+  display: block;
+}
+
+.chat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  position: relative;
+}
+
+.delete-chat {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.chat-item:hover .delete-chat {
+  display: inline;
+}
+
+.bot {
+  align-self: flex-start;
+  background-color: #2196f3;
+  position: relative;
+  transition: background-color 0.3s ease-in-out;
+  padding-right: 30px; /* Extra space for the mute button */
+}
+
+.bot:hover {
+  background-color: #1e88e5;
+}
+
+.speak-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+}
+.bot:hover .speak-btn {
+  display: inline;
+}
+.speak-btn.muted {
+  color: #f44336;
+}
+.speak-btn.muted:hover {
+  color: #d32f2f;
 }
