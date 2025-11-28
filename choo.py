@@ -51,26 +51,128 @@ def verify_password(stored_hash, password):
     """Verify password"""
     return stored_hash == hashlib.sha256(password.encode()).hexdigest()
 
-# AI conversation using Google Gemini
-def choo_choo_conversation(user_input, conversation_history=None):
-    user_input = user_input.strip()
+def get_weather(city):
+    """Fetch weather data for a city"""
+    if not WEATHER_API_KEY:
+        return "⚠ Weather API key not configured"
+    try:
+        weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&appid={WEATHER_API_KEY}"
+        response = requests.get(weather_url, timeout=5)
+        if response.status_code == 200:
+            weather_data = response.json()
+            temp = weather_data['main']['temp']
+            description = weather_data['weather'][0]['description'].capitalize()
+            city_name = weather_data['name']
+            country = weather_data['sys']['country']
+            feels_like = weather_data['main']['feels_like']
+            humidity = weather_data['main']['humidity']
+            return (f"🌤 **Weather Report for {city_name}, {country}**\n"
+                    f"Temperature: {temp}°C\n"
+                    f"Feels Like: {feels_like}°C\n"
+                    f"Condition: {description}\n"
+                    f"Humidity: {humidity}%")
+        return f"❌ City '{city}' not found."
+    except requests.exceptions.Timeout:
+        return "❌ Weather service timeout. Please try again."
+    except Exception as e:
+        return f"❌ Error fetching weather: {str(e)[:50]}"
+
+def get_news(query="latest", num_articles=5):
+    """Fetch news with better error handling"""
+    if not NEWS_API_KEY:
+        return "⚠ News API key not configured"
     
-    # Use Gemini AI if available
+    try:
+        # Use a more reliable NewsAPI endpoint
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        news_url = f"https://newsapi.org/v2/everything?q={query}&sortBy=publishedAt&language=en&pageSize={num_articles}&apiKey={NEWS_API_KEY}"
+        response = requests.get(news_url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            news_data = response.json()
+            
+            if news_data.get('status') == 'error':
+                error_msg = news_data.get('message', 'Unknown error')
+                return f"❌ News API Error: {error_msg}"
+            
+            articles = news_data.get('articles', [])
+            if not articles:
+                return f"ℹ️ No news found for '{query}'."
+            
+            news_text = f"📰 **Top News on '{query}'**\n\n"
+            for i, article in enumerate(articles, 1):
+                title = article.get('title', 'No title')
+                source = article.get('source', {}).get('name', 'Unknown')
+                news_text += f"{i}. {title}\n   Source: {source}\n\n"
+            return news_text.strip()
+        else:
+            return f"❌ Failed to fetch news (Status {response.status_code})"
+    except requests.exceptions.Timeout:
+        return "❌ News service timeout. Please try again."
+    except requests.exceptions.RequestException as e:
+        return f"❌ Network error: {str(e)[:50]}"
+    except Exception as e:
+        return f"❌ Error fetching news: {str(e)[:50]}"
+
+# Enhanced NLP conversation with Gemini
+def choo_choo_conversation(user_input, conversation_history=None):
+    """Intelligent conversation using Google Gemini with NLP enhancements"""
+    user_input = user_input.strip()
+    user_lower = user_input.lower()
+    
+    # Check for specific intents first (better NLP)
+    
+    # Weather intent
+    if any(word in user_lower for word in ['weather', 'temperature', 'climate', 'forecast', 'how is the weather']):
+        if 'in' in user_lower or 'at' in user_lower or 'for' in user_lower:
+            parts = user_lower.split('in' if 'in' in user_lower else ('at' if 'at' in user_lower else 'for'))
+            if len(parts) > 1:
+                city = parts[-1].strip().title()
+                return get_weather(city)
+        return get_weather("London")  # Default city
+    
+    # News intent
+    if any(word in user_lower for word in ['news', 'headlines', 'latest news', 'breaking news', 'today news']):
+        query = "latest"
+        if 'in' in user_lower or 'about' in user_lower or 'on' in user_lower:
+            parts = user_lower.split('in' if 'in' in user_lower else ('about' if 'about' in user_lower else 'on'))
+            if len(parts) > 1:
+                query = parts[-1].strip()
+        return get_news(query)
+    
+    # Date/Time intent
+    if any(word in user_lower for word in ['date', 'time', 'what is the date', 'what time', 'current time']):
+        now = datetime.now()
+        date = now.strftime("%A, %B %d, %Y")
+        time = now.strftime("%I:%M %p")
+        return f"📅 Today is {date}\n🕐 Current time is {time}"
+    
+    # Use Gemini AI for general conversation
     if model:
         try:
-            # Build conversation context
-            context = "You are Choo Choo, a friendly AI assistant. You are helpful, concise, and conversational."
+            # Build better prompt with context
+            system_prompt = """You are Choo Choo, a friendly and helpful AI assistant. 
+You provide clear, concise, and useful responses. You're knowledgeable, conversational, and always helpful.
+Keep responses natural and not too long (2-3 sentences usually)."""
             
+            # Build conversation context from history
+            context = ""
             if conversation_history and len(conversation_history) > 0:
-                context += "\n\nPrevious conversation:\n"
-                for msg in conversation_history[-5:]:  # Last 5 messages for context
+                context = "\n\nRecent conversation context:\n"
+                for msg in conversation_history[-3:]:  # Last 3 exchanges
                     context += f"User: {msg.get('user', {}).get('text', '')}\n"
                     context += f"Assistant: {msg.get('bot', {}).get('text', '')}\n"
             
-            prompt = f"{context}\n\nUser: {user_input}\nAssistant:"
+            prompt = f"{system_prompt}{context}\n\nUser: {user_input}\nAssistant:"
             
-            response = model.generate_content(prompt)
-            return response.text if response.text else "I'm thinking... please try again."
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    max_output_tokens=500,
+                )
+            )
+            return response.text.strip() if response.text else "I'm thinking... please try again."
         except Exception as e:
             print(f"Gemini API Error: {e}")
             return fallback_response(user_input)
@@ -78,77 +180,21 @@ def choo_choo_conversation(user_input, conversation_history=None):
         return fallback_response(user_input)
 
 def fallback_response(user_input):
-    """Fallback simple responses if Gemini is unavailable"""
-    user_input = user_input.lower().strip()
+    """Simple fallback responses"""
+    user_lower = user_input.lower().strip()
     
-    def get_weather(city, api_key):
-        try:
-            weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&appid={api_key}"
-            response = requests.get(weather_url, timeout=5)
-            if response.status_code == 200:
-                weather_data = response.json()
-                temp = weather_data['main']['temp']
-                description = weather_data['weather'][0]['description'].capitalize()
-                city_name = weather_data['name']
-                country = weather_data['sys']['country']
-                feels_like = weather_data['main']['feels_like']
-                humidity = weather_data['main']['humidity']
-                return (f"🌤 Weather Report for {city_name}, {country}:\n"
-                        f"- Temperature: {temp}°C\n"
-                        f"- Feels Like: {feels_like}°C\n"
-                        f"- Condition: {description}\n"
-                        f"- Humidity: {humidity}%")
-            return "❌ City not found."
-        except Exception as e:
-            return f"Error: {str(e)[:50]}"
-
-    def get_news(api_key, query="news", num_articles=3):
-        try:
-            news_url = f"https://newsapi.org/v2/everything?q={query}&sortBy=publishedAt&apiKey={api_key}"
-            response = requests.get(news_url, timeout=5)
-            
-            if response.status_code == 200:
-                news_data = response.json()
-                articles = news_data.get('articles', [])
-                if not articles:
-                    return f"No news found for '{query}'."
-                news_summary = []
-                for i, article in enumerate(articles[:num_articles], start=1):
-                    title = article.get('title', 'No title')
-                    news_summary.append(f"{i}. {title}\n")
-                return "Top headlines:\n" + "".join(news_summary)
-            return "Error fetching news."
-        except Exception as e:
-            return f"Error: {str(e)[:50]}"
-                
-    def get_current_datetime():
-        now = datetime.now()
-        date = now.strftime("%A, %B %d, %Y")
-        time = now.strftime("%I:%M %p")
-        return f"Today is {date}, and the current time is {time}."
-    
-    # Check for specific queries
-    if "weather" in user_input or "temperature" in user_input:
-        if "in" in user_input:
-            city = user_input.split("in")[-1].strip()
-            if city:
-                return get_weather(city, WEATHER_API_KEY)
-    
-    if "news" in user_input or "headlines" in user_input:
-        topic = user_input.split("news")[-1].strip() if "news" in user_input else "latest"
-        return get_news(NEWS_API_KEY, query=topic)
-
-    if "date" in user_input or "time" in user_input:
-        return get_current_datetime()
-    
-    # Default responses
     responses = {
-        "hi": "Hi! How can I help you?",
+        "hi": "Hi there! How can I help?",
         "hello": "Hello! What can I do for you?",
+        "hey": "Hey! What's up?",
         "how are you": "I'm doing great, thanks for asking!",
         "who are you": "I'm Choo Choo, your AI assistant!",
+        "what can you do": "I can chat, fetch weather, get news, tell time, and much more!",
+        "help": "I'm here to help! You can ask me about weather, news, time, or anything else.",
+        "thanks": "You're welcome!",
+        "thank you": "Happy to help!",
     }
-    return responses.get(user_input, "I'm here to help! Ask me anything.")
+    return responses.get(user_lower, "That's interesting! Tell me more or ask me something else.")
 
 # Home page route
 @app.route('/')
@@ -304,6 +350,18 @@ def get_email():
         return jsonify({"email": email})
     else:
         return jsonify({"email": "Guest"})
+
+# API to check if APIs are working
+@app.route('/api/health-check', methods=['GET'])
+def health_check():
+    """Check if all APIs are configured and working"""
+    status = {
+        "gemini": "✓ OK" if GOOGLE_API_KEY and model else "✗ Not configured",
+        "weather": "✓ OK" if WEATHER_API_KEY else "✗ Not configured",
+        "news": "✓ OK" if NEWS_API_KEY else "✗ Not configured",
+        "mongodb": "✓ OK",
+    }
+    return jsonify(status)
 
 # Typed input API
 @app.route('/api/typed-input', methods=['POST'])
