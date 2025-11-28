@@ -3,28 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Choo Choo</title>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="theme-color" content="#667eea">
+    <title>Choo Choo - AI Assistant</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
     <header>
         <div class="logo">
             <a href="/hom">
-                <img src="/static/logo.jpg" alt="Logo">
+                <img src="/static/logo.jpg" alt="Choo Choo Logo">
             </a>
-            
             <h2>Choo Choo</h2>
-            
         </div>
     </header>
 
-    <div id="chat-container">
-        <div id="messages"></div>
-        <div id="input-container">
-            <input type="text" id="user-input" placeholder="Type a message...">
-            <button id="send-button">Send</button>
-            <button id="microphone">🎙</button>
+    <div class="main-container">
+        <button class="hamburger-btn" id="toggle-history-btn">☰</button>
+        
+        <div class="chat-history">
+            <h3 class="chathistory-h3">Chat History</h3>
+            <button id="new-chat-btn" onclick="createNewChat()">+ New Chat</button>
+            <ul id="history-list"></ul>
+        </div>
+
+        <div id="chat-container">
+            <div id="messages"></div>
+            <div id="input-container">
+                <input type="text" id="user-input" placeholder="Type a message...">
+                <button id="send-button">Send</button>
+                <button id="microphone">🎙</button>
+            </div>
         </div>
     </div>
 

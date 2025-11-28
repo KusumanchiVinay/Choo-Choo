@@ -2,13 +2,16 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from pymongo import MongoClient
 import requests
 from datetime import datetime
-import threading
 import os
 from bson import ObjectId
 from dotenv import load_dotenv
+import hashlib
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-key-change-in-production")
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Load environment variables
 load_dotenv(".env.local", override=False)
@@ -17,21 +20,30 @@ load_dotenv(".env.local", override=False)
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
-  
+
 # MongoDB connection setup
 try:
-    client = MongoClient(MONGO_URI)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    client.admin.command('ismaster')
     db = client['Users']
     users_collection = db['users']
     chat_history_collection = db['chat_history']
+    print("✓ MongoDB connected successfully")
 except Exception as e:
-    print(f"MongoDB Connection Error: {e}")
+    print(f"⚠ MongoDB Connection Error: {e}")
+
+def hash_password(password):
+    """Hash password for security"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(stored_hash, password):
+    """Verify password"""
+    return stored_hash == hashlib.sha256(password.encode()).hexdigest()
 
 # Simple conversation logic
 def choo_choo_conversation(user_input):
     user_input = user_input.lower().strip()
     
-    # Function to fetch weather data
     def get_weather(city, api_key):
         try:
             weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&appid={api_key}"
@@ -54,9 +66,8 @@ def choo_choo_conversation(user_input):
             else:
                 return "⚠ Error fetching weather data. Please try again later."
         except Exception as e:
-            return f"🚨 An error occurred: {e}"
+            return f"🚨 Error: {str(e)[:50]}"
 
-    # Function to fetch current news
     def get_news(api_key, query="news", num_articles=3):
         try:
             news_url = f"https://newsapi.org/v2/everything?q={query}&sortBy=publishedAt&apiKey={api_key}"
@@ -80,9 +91,8 @@ def choo_choo_conversation(user_input):
             return f"Error fetching news: {response.status_code}"
 
         except Exception as e:
-            return f"An error occurred: {str(e)}"
+            return f"Error: {str(e)[:50]}"
                 
-    # Function to fetch current date and time
     def get_current_datetime():
         now = datetime.now()
         date = now.strftime("%A, %B %d, %Y")
@@ -137,8 +147,11 @@ def home():
 def login():
     if request.method == 'POST':
         data = request.json
-        email = data.get('email')
-        password = data.get('password')
+        email = data.get('email', '').lower()
+        password = data.get('password', '')
+        
+        if not email or not password:
+            return jsonify({"message": "Email and password required."}), 400
         
         # Query the database for the user
         user = users_collection.find_one({"email": email})
@@ -146,15 +159,17 @@ def login():
         if not user:
             return jsonify({"message": "Oops, user does not exist."}), 404
         
-        if user['password'] != password:
+        if not verify_password(user.get('password_hash'), password):
             return jsonify({"message": "Wrong password."}), 401
         
         session.clear()
         session['email'] = email
+        session['user_id'] = str(user['_id'])
 
         # Create a new chat session on login
         session_doc = {
             "email": email,
+            "user_id": str(user['_id']),
             "title": "New Chat",
             "messages": [],
             "created_at": datetime.utcnow()
@@ -170,19 +185,27 @@ def login():
 def signup():
     if request.method == 'POST':
         data = request.json
-        name = data.get('name')
-        email = data.get('email')
-        password = data.get('password')
+        name = data.get('name', '').strip()
+        email = data.get('email', '').lower().strip()
+        password = data.get('password', '')
         
         if not name or not email or not password:
             return jsonify({"message": "All fields are required."}), 400
+        
+        if len(password) < 6:
+            return jsonify({"message": "Password must be at least 6 characters."}), 400
         
         # Check if the email already exists
         if users_collection.find_one({"email": email}):
             return jsonify({"message": "User already exists or try with a different email ID."}), 409
         
-        # Insert the new user into the database
-        users_collection.insert_one({"name": name, "email": email, "password": password})
+        # Insert the new user with hashed password
+        users_collection.insert_one({
+            "name": name, 
+            "email": email, 
+            "password_hash": hash_password(password),
+            "created_at": datetime.utcnow()
+        })
         return jsonify({"message": "Account Created successful"}), 200
     
     return render_template('signup.html')
@@ -207,6 +230,7 @@ def index():
         # Create a new chat session
         session_doc = {
             "email": session['email'],
+            "user_id": session.get('user_id'),
             "title": "New Chat",
             "messages": [],
             "created_at": datetime.utcnow()
@@ -224,6 +248,7 @@ def hom():
 def logout():
     session.pop('email', None)
     session.pop('chat_session_id', None)
+    session.pop('user_id', None)
     return render_template('home.html')
 
 @app.route('/new-chat', methods=['GET'])
@@ -233,6 +258,7 @@ def new_chat():
     
     session_doc = {
         "email": session['email'],
+        "user_id": session.get('user_id'),
         "title": "New Chat",
         "messages": [],
         "created_at": datetime.utcnow()
@@ -255,8 +281,12 @@ def get_email():
 @app.route('/api/typed-input', methods=['POST'])
 def api_typed_input():
     data = request.json
-    user_input = data.get('text')
+    user_input = data.get('text', '').strip()
     session_id = data.get('sessionId') or session.get('chat_session_id')
+    
+    if not user_input:
+        return jsonify({"error": "Empty input"}), 400
+    
     response = choo_choo_conversation(user_input)
     updated_title = None
 
@@ -273,7 +303,8 @@ def api_typed_input():
                     )
                 new_entry = {
                     "user": {"text": user_input},
-                    "bot": {"text": response}
+                    "bot": {"text": response},
+                    "timestamp": datetime.utcnow()
                 }
                 chat_history_collection.update_one(
                     {'_id': ObjectId(session_id)},
@@ -291,7 +322,7 @@ def chat_history():
     if not email:
         return jsonify({"error": "Unauthorized"}), 401
     try:
-        sessions_cursor = chat_history_collection.find({"email": email}).sort("created_at", -1)
+        sessions_cursor = chat_history_collection.find({"email": email}).sort("created_at", -1).limit(20)
         chat_list = []
         for s in sessions_cursor:
             messages = s.get("messages", [])
@@ -300,7 +331,8 @@ def chat_history():
                 "chat_session_id": str(s["_id"]),
                 "title": s.get("title", "No Title"),
                 "created_at": s["created_at"].isoformat(),
-                "preview": preview
+                "preview": preview,
+                "message_count": len(messages)
             })
         return jsonify({"chat_history": chat_list})
     except Exception as e:
@@ -314,6 +346,7 @@ def new_session():
     try:
         session_doc = {
             "email": session['email'],
+            "user_id": session.get('user_id'),
             "title": "New Chat",
             "messages": [],
             "created_at": datetime.utcnow()
@@ -334,6 +367,8 @@ def get_chat(session_id):
         chat_session = chat_history_collection.find_one({'_id': ObjectId(session_id), 'email': email})
         if chat_session:
             chat_session['_id'] = str(chat_session['_id'])
+            if 'created_at' in chat_session:
+                chat_session['created_at'] = chat_session['created_at'].isoformat()
             return jsonify(chat_session), 200
         return jsonify({"error": "Chat not found"}), 404
     except Exception as e:
@@ -352,6 +387,15 @@ def delete_chat(session_id):
         return jsonify({"error": "Chat not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# Error handlers
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "Resource not found"}), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"error": "Server error"}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
